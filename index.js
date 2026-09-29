@@ -13,8 +13,14 @@ const manifest = {
     id: "org.stremio.streamingcommunity.ita",
     version: "1.0.0",
     name: "StreamingCommunity ITA",
-    description: "StreamingCommunity per Stremio",
-    resources: ["stream"],
+    description: "Guarda film e serie TV da StreamingCommunity",
+    resources: [
+        {
+            name: "stream",
+            types: ["movie", "series"],
+            idPrefixes: ["tt"]
+        }
+    ],
     types: ["movie", "series"],
     idPrefixes: ["tt"],
     catalogs: []
@@ -25,8 +31,8 @@ const builder = new addonBuilder(manifest);
 async function getMediaDetails(imdbId, type) {
     try {
         const url = `https://v3-cinemeta.strem.io/meta/${type}/${imdbId}.json`;
-        console.log(`[Cinemeta] Richiesta info per ${imdbId} (${type})...`);
-        const response = await axios.get(url);
+        console.log(`[Cinemeta] Recupero informazioni per ID ${imdbId} (${type})...`);
+        const response = await axios.get(url, { timeout: 5000 });
         if (response.data && response.data.meta) {
             return {
                 title: response.data.meta.name,
@@ -41,14 +47,14 @@ async function getMediaDetails(imdbId, type) {
 
 async function searchStreamingCommunity(title) {
     try {
-        console.log(`[SC Search] Ricerca per titolo: "${title}" su ${SC_DOMAIN}...`);
+        console.log(`[SC Search] Ricerca su StreamingCommunity per: "${title}"...`);
         const searchUrl = `${SC_DOMAIN}/api/search?q=${encodeURIComponent(title)}`;
         const response = await axios.get(searchUrl, { headers: HTTP_HEADERS, timeout: 5000 });
 
         if (response.data && response.data.data && response.data.data.length > 0) {
             const match = response.data.data[0];
             const watchUrl = `${SC_DOMAIN}/watch/${match.id}`;
-            console.log(`[SC Success] Trovato ID: ${match.id} - ${match.name || title}`);
+            console.log(`[SC Found] Trovato match ID ${match.id}: ${match.name || title}`);
 
             return {
                 name: "StreamingCommunity",
@@ -72,12 +78,16 @@ async function searchStreamingCommunity(title) {
 }
 
 builder.defineStreamHandler(async (args) => {
-    console.log(`\n--- Richiesta Stream Ricevuta! Type: ${args.type}, ID: ${args.id} ---`);
+    console.log(`\n==================================================`);
+    console.log(`[STREAM REQUEST] Ricevuta richiesta da Stremio!`);
+    console.log(`Tipo: ${args.type} | ID: ${args.id}`);
+    console.log(`==================================================`);
+
     const cleanImdbId = args.id.split(":")[0];
-    
     const mediaInfo = await getMediaDetails(cleanImdbId, args.type);
+
     if (!mediaInfo) {
-        console.log("[Stream Handler] Nessuna info ottenuta da Cinemeta.");
+        console.log("[Stream Handler] Impossibile recuperare i dettagli da Cinemeta.");
         return { streams: [] };
     }
 
@@ -91,4 +101,4 @@ builder.defineStreamHandler(async (args) => {
 
 const PORT = process.env.PORT || 7000;
 serveHTTP(builder.getInterface(), { port: PORT });
-console.log(`Add-on avviato correttamente sulla porta ${PORT}`);
+console.log(`Add-on avviato sulla porta ${PORT}`);
