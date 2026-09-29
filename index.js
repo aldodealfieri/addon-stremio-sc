@@ -15,7 +15,8 @@ const manifest = {
     description: "Cerca e riproduce contenuti da StreamingCommunity in italiano",
     resources: ["stream"],
     types: ["movie", "series"],
-    idPrefixes: ["tt"]
+    idPrefixes: ["tt"],
+    catalogs: [] // Aggiunta la lista catalogo vuota per conformità SDK Stremio
 };
 
 const builder = new addonBuilder(manifest);
