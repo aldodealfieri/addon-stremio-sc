@@ -1,5 +1,10 @@
-const { addonBuilder, serveHTTP } = require("stremio-addon-sdk");
+const express = require("express");
+const cors = require("cors");
+const { addonBuilder } = require("stremio-addon-sdk");
 const axios = require("axios");
+
+const app = express();
+app.use(cors()); // Abilita CORS per permettere a Stremio (Web, App, TV) di comunicare senza blocchi
 
 const SC_DOMAIN = "https://streamingcommunityz.pictures";
 
@@ -10,17 +15,11 @@ const HTTP_HEADERS = {
 };
 
 const manifest = {
-    id: "org.stremio.streamingcommunity.ita",
+    id: "org.stremio.sc.render.cloud",
     version: "1.0.0",
-    name: "StreamingCommunity ITA",
-    description: "Guarda film e serie TV da StreamingCommunity",
-    resources: [
-        {
-            name: "stream",
-            types: ["movie", "series"],
-            idPrefixes: ["tt"]
-        }
-    ],
+    name: "StreamingCommunity Cloud",
+    description: "Guarda film e serie TV da StreamingCommunity in cloud",
+    resources: ["stream"],
     types: ["movie", "series"],
     idPrefixes: ["tt"],
     catalogs: []
@@ -31,7 +30,7 @@ const builder = new addonBuilder(manifest);
 async function getMediaDetails(imdbId, type) {
     try {
         const url = `https://v3-cinemeta.strem.io/meta/${type}/${imdbId}.json`;
-        console.log(`[Cinemeta] Recupero informazioni per ID ${imdbId} (${type})...`);
+        console.log(`[Cinemeta] Info per ${imdbId} (${type})...`);
         const response = await axios.get(url, { timeout: 5000 });
         if (response.data && response.data.meta) {
             return {
@@ -40,21 +39,21 @@ async function getMediaDetails(imdbId, type) {
             };
         }
     } catch (error) {
-        console.error("[Cinemeta Error]:", error.message);
+        console.log("[Cinemeta Error]:", error.message);
     }
     return null;
 }
 
 async function searchStreamingCommunity(title) {
     try {
-        console.log(`[SC Search] Ricerca su StreamingCommunity per: "${title}"...`);
+        console.log(`[Ricerca SC] Avvio ricerca per "${title}"...`);
         const searchUrl = `${SC_DOMAIN}/api/search?q=${encodeURIComponent(title)}`;
         const response = await axios.get(searchUrl, { headers: HTTP_HEADERS, timeout: 5000 });
 
         if (response.data && response.data.data && response.data.data.length > 0) {
             const match = response.data.data[0];
             const watchUrl = `${SC_DOMAIN}/watch/${match.id}`;
-            console.log(`[SC Found] Trovato match ID ${match.id}: ${match.name || title}`);
+            console.log(`[Risultato SC] Trovato match: ${match.name || title} (ID: ${match.id})`);
 
             return {
                 name: "StreamingCommunity",
@@ -69,36 +68,54 @@ async function searchStreamingCommunity(title) {
                 }
             };
         } else {
-            console.log(`[SC Search] Nessun risultato trovato per: "${title}"`);
+            console.log(`[Ricerca SC] Nessun risultato per "${title}"`);
         }
     } catch (error) {
-        console.error("[SC Search Error]:", error.message);
+        console.log("[Ricerca SC Error]:", error.message);
     }
     return null;
 }
 
 builder.defineStreamHandler(async (args) => {
-    console.log(`\n==================================================`);
-    console.log(`[STREAM REQUEST] Ricevuta richiesta da Stremio!`);
+    console.log(`\n==============================================`);
+    console.log(`[STREAM REQUEST] Chiamata ricevuta da Stremio!`);
     console.log(`Tipo: ${args.type} | ID: ${args.id}`);
-    console.log(`==================================================`);
+    console.log(`==============================================`);
 
     const cleanImdbId = args.id.split(":")[0];
     const mediaInfo = await getMediaDetails(cleanImdbId, args.type);
 
-    if (!mediaInfo) {
-        console.log("[Stream Handler] Impossibile recuperare i dettagli da Cinemeta.");
-        return { streams: [] };
-    }
+    if (!mediaInfo) return { streams: [] };
 
     const scStream = await searchStreamingCommunity(mediaInfo.title);
-    if (scStream) {
-        return { streams: [scStream] };
-    }
+    if (scStream) return { streams: [scStream] };
 
     return { streams: [] };
 });
 
+// Integrazione dell'interfaccia dell'SDK con Express
+const addonInterface = builder.getInterface();
+
+app.get("/manifest.json", (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Headers", "*");
+    res.json(addonInterface.manifest);
+});
+
+app.get("/stream/:type/:id.json", async (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Headers", "*");
+    const { type, id } = req.params;
+    const cleanId = id.replace(".json", "");
+    const response = await addonInterface.get("stream", type, cleanId);
+    res.json(response);
+});
+
+app.get("/", (req, res) => {
+    res.send("Add-on Stremio StreamingCommunity per Render è attivo!");
+});
+
 const PORT = process.env.PORT || 7000;
-serveHTTP(builder.getInterface(), { port: PORT });
-console.log(`Add-on avviato sulla porta ${PORT}`);
+app.listen(PORT, () => {
+    console.log(`Server Express avviato sulla porta ${PORT}`);
+});
