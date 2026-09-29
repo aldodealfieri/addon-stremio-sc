@@ -1,0 +1,1 @@
+# addon-stremio-sc
