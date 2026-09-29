@@ -4,7 +4,7 @@ const { addonBuilder } = require("stremio-addon-sdk");
 const axios = require("axios");
 
 const app = express();
-app.use(cors()); // Abilita CORS per permettere a Stremio (Web, App, TV) di comunicare senza blocchi
+app.use(cors());
 
 const SC_DOMAIN = "https://streamingcommunityz.pictures";
 
@@ -93,7 +93,6 @@ builder.defineStreamHandler(async (args) => {
     return { streams: [] };
 });
 
-// Integrazione dell'interfaccia dell'SDK con Express
 const addonInterface = builder.getInterface();
 
 app.get("/manifest.json", (req, res) => {
@@ -102,12 +101,16 @@ app.get("/manifest.json", (req, res) => {
     res.json(addonInterface.manifest);
 });
 
-app.get("/stream/:type/:id.json", async (req, res) => {
+// Rotta flessibile per intercettare qualsiasi variante di chiamata stream
+app.get("/stream/:type/:id", async (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Headers", "*");
-    const { type, id } = req.params;
-    const cleanId = id.replace(".json", "");
-    const response = await addonInterface.get("stream", type, cleanId);
+    
+    let { type, id } = req.params;
+    id = id.replace(".json", ""); // rimuove l'estensione se presente
+    
+    console.log(`[HTTP GET] Intercettata rotta stream per ${type} / ${id}`);
+    const response = await addonInterface.get("stream", type, id);
     res.json(response);
 });
 
