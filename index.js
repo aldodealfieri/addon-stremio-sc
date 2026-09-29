@@ -1,7 +1,7 @@
 const { addonBuilder, serveHTTP } = require("stremio-addon-sdk");
 const axios = require("axios");
 
-let SC_DOMAIN = "https://streamingcommunity.vip";
+let SC_DOMAIN = "https://streamingcommunityz.pictures";
 
 const HTTP_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
